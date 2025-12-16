@@ -12,6 +12,41 @@ interface AvatarViewerProps {
   };
 }
 
+// Retarget animation from Mixamo bone names to RPM bone names
+function retargetAnimation(clip: THREE.AnimationClip): THREE.AnimationClip {
+  const newTracks: THREE.KeyframeTrack[] = [];
+
+  for (const track of clip.tracks) {
+    // Determine target property
+    // We only want to retarget rotations (quaternions) to avoid position scaling issues
+    // causing the avatar to fly away or distort
+    if (track.name.endsWith('.position') || track.name.endsWith('.scale')) {
+      continue;
+    }
+
+    // Convert Mixamo bone names to RPM format
+    // Example: "mixamorigHips.quaternion" -> "Hips.quaternion"
+    const newName = track.name.replace(/^mixamorig/, '');
+
+    // Clone the track with the new name
+    const TrackConstructor = track.constructor as new (
+      name: string,
+      times: Float32Array,
+      values: Float32Array
+    ) => THREE.KeyframeTrack;
+
+    const newTrack = new TrackConstructor(
+      newName,
+      track.times as Float32Array,
+      track.values as Float32Array
+    );
+
+    newTracks.push(newTrack);
+  }
+
+  return new THREE.AnimationClip(clip.name, clip.duration, newTracks);
+}
+
 export default function AvatarViewer({ avatarUrl, animationUrls }: AvatarViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -62,6 +97,8 @@ export default function AvatarViewer({ avatarUrl, animationUrls }: AvatarViewerP
         (gltf: any) => {
           const model = gltf.scene;
           model.scale.set(1, 1, 1);
+          // Adjust model position to center it
+          model.position.y = -1.0;
           scene.add(model);
 
           // Setup animation mixer
@@ -76,7 +113,8 @@ export default function AvatarViewer({ avatarUrl, animationUrls }: AvatarViewerP
           const onAnimationLoaded = (name: string, fbxScene: THREE.Group) => {
             const animation = fbxScene.animations[0];
             if (animation) {
-              const action = mixer.clipAction(animation);
+              const retargetedClip = retargetAnimation(animation);
+              const action = mixer.clipAction(retargetedClip);
               actionsRef.current[name] = action;
               loadedAnimations++;
 
