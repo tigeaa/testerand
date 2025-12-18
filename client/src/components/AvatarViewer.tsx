@@ -96,7 +96,7 @@ export default function AvatarViewer({ avatarUrl, animationUrls }: AvatarViewerP
         avatarUrl,
         (gltf: any) => {
           const model = gltf.scene;
-          model.scale.set(10, 10, 10);
+          model.scale.set(5, 5, 5);
           // Adjust model position to center it
           model.position.y = -1.0;
           scene.add(model);
